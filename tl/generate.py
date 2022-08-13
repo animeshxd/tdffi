@@ -111,14 +111,17 @@ def construct(tl_constructor: str, f, class__: str, isfunc=False):
         sio.write(s)
         sio.write("\n")
 
-    sio.write('    @override\n')
-    sio.write('    Map<String, dynamic> toJson() {\n')
-    sio.write(f'        return {{{_json}}};\n')
-    sio.write('    }\n')
-    sio.write('    @override\n')
-    sio.write('    Pointer<Utf8> toCharPtr() {\n')
-    sio.write(f'        return jsonEncode(toJson()).toNativeUtf8();\n')
-    sio.write('    }\n')
+    methods = f"""\
+    @override
+    Map<String, dynamic> toJson() {{
+         return {{{_json}}};
+    }}
+    @override
+    Pointer<Utf8> toCharPtr() {{
+         return jsonEncode(toJson()).toNativeUtf8();
+    }}
+    """
+    sio.write(methods)
         
     sio.write('}\n')
 
