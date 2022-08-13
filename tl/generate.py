@@ -117,7 +117,7 @@ def construct(tl_constructor: str, f, class__: str, isfunc=False):
     sio.write('    }\n')
     sio.write('    @override\n')
     sio.write('    Pointer<Utf8> toCharPtr() {\n')
-    sio.write(f'        return jsonEncode({{{_json}}}).toNativeUtf8();\n')
+    sio.write(f'        return jsonEncode(toJson()).toNativeUtf8();\n')
     sio.write('    }\n')
         
     sio.write('}\n')

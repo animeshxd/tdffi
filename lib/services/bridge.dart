@@ -49,4 +49,9 @@ class Bridge extends td_json_client {
     var c = td_receive(timeout);
     return c == nullptr ? null : json.decode(c.toDartString());
   }
+
+  Future<Map?> td_json_client_receive_(Pointer<Void> client, {double timeout = 10}) async {
+    var c = td_json_client_receive(client, timeout);
+    return c == nullptr ? null : json.decode(c.toDartString());
+  }
 }
