@@ -1,0 +1,47 @@
+name: tdffi
+description: A sample command-line application.
+version: 1.0.0
+# homepage: https://www.example.com
+
+environment:
+  sdk: '>=2.17.6 <3.0.0'
+
+# dependencies:
+#   path: ^1.8.0
+
+dev_dependencies:
+  ffigen: ^6.0.1
+  lints: ^2.0.0
+  test: ^1.16.0
+
+
+ffigen:
+  name: td_json_client
+  description: td_json_client.h File Reference.
+  output: 'lib/ffi/td_json_client.dart'
+  headers:
+    entry-points:
+      - 'lib/ffi/td_json_client.h'
+
+  type-map:
+    'native-types': # Targets native types.
+      'char':
+        'lib': 'pkg_ffi' # predefined import.
+        'c-type': 'Utf8'
+        'dart-type': 'Utf8'
+      'int':
+        'lib': 'ffi'
+        'c-type': 'Int32'
+        'dart-type': 'int'
+  comments:
+    style: any
+  preamble: |
+    //
+    // Copyright Aliaksei Levin (levlam@telegram.org), Arseny Smirnov (arseny30@gmail.com) 2014-2022
+    //
+    // Distributed under the Boost Software License, Version 1.0. (See accompanying
+    // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
+    //
+
+    // ignore_for_file: camel_case_types, non_constant_identifier_names
+dependencies: {ffi: ^2.0.1}

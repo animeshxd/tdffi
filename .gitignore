@@ -1,0 +1,12 @@
+# Files and directories created by pub.
+.dart_tool/
+.packages
+
+# Conventional directory for build output.
+build/
+native/libtdjson.so.1.8.4
+lib/td/classes.dart
+lib/td/functions.dart
+lib/ffi/td_json_client.h
+lib/ffi/tdjson_export.h
+tl/td_api.tl
