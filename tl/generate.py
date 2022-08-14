@@ -28,7 +28,9 @@ exports_function = "lib/td/functions.dart"
 TlObject = """
 abstract class TlObject {
   Map<String, dynamic> toJson();
+  String toJsonEncoded();
   Pointer<Utf8> toCharPtr();
+
 }
 """.strip()
 
@@ -146,7 +148,7 @@ def construct(tl_constructor: str, f, class__: str, isfunc=False):
                     isabst = absts[dtype]
                     is_tl = True
                     if isabst:
-                        temp = f"switch (_map?[{darg}]?['@type']) {{"
+                        temp = f"switch (_map?['{darg}']?['@type']) {{"
                         for a in isabst:
                             temp += f"""
                             case '{a}':
@@ -184,7 +186,8 @@ def construct(tl_constructor: str, f, class__: str, isfunc=False):
                         ldargs += temp
                         # print('_______________')
                     else:
-                        ldargs += f'{_xdarg} = (_map?["{darg}"] as List<{_}>);\n          '
+                        # ldargs += f'{_xdarg} = (_map?["{darg}"] ?? [])?.map((e) => {_}.fromMap(e)).toList();\n          '
+                        ldargs += f'{_xdarg} = {dtype}.from((_map?["{darg}"] ?? []).map((e) => {_}.fromMap(e)));\n          '
 
                 elif istlobj in (Type.VECTOR_DART, Type.DART):
                     if (i == l - 1):
@@ -211,9 +214,14 @@ def construct(tl_constructor: str, f, class__: str, isfunc=False):
         sio.write("\n")
 
     methods = f"""\
+    final String TYPE = "{class_name}";
     @override
     Map<String, dynamic> toJson() {{
          return {{{_json}}};
+    }}
+    @override
+    String toJsonEncoded(){{
+        return jsonEncode(toJson());
     }}
     @override
     Pointer<Utf8> toCharPtr() {{
