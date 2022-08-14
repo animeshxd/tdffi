@@ -72,6 +72,18 @@ void main(List<String> arguments) async {
               break;
           }
           break;
+        case 'updateUser':
+          print('user');
+          // print(r);
+          // print(r['user']?['profile_photo']);
+          // print(r['user']?['profile_photo']?['id'].runtimeType);
+          // print(r['user']?['profile_photo']?['small']?['id']?.runtimeType);
+
+          var user = td.updateUser.fromMap(r);
+          print(user.user_!.first_name);
+          // print(user.toJson());
+          break;
+        case 'updateNewChat':
         case 'updateOption':
           break;
         case 'error':

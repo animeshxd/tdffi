@@ -24,7 +24,7 @@ class Bridge extends td_json_client {
     }
   }
 
-  Future<Map?> td_execute_(Func request) async {
+  Future<Map<String, dynamic>?> td_execute_(Func request) async {
     var c_str = json.encode(request).toNativeUtf8();
     var c = td_execute(c_str);
     malloc.free(c_str);
@@ -45,12 +45,12 @@ class Bridge extends td_json_client {
     return td_create_client_id();
   }
 
-  Future<Map?> td_receive_({double timeout = 10}) async {
+  Future<Map<String, dynamic>?> td_receive_({double timeout = 10}) async {
     var c = td_receive(timeout);
     return c == nullptr ? null : json.decode(c.toDartString());
   }
 
-  Future<Map?> td_json_client_receive_(Pointer<Void> client, {double timeout = 10}) async {
+  Future<Map<String, dynamic>?> td_json_client_receive_(Pointer<Void> client, {double timeout = 10}) async {
     var c = td_json_client_receive(client, timeout);
     return c == nullptr ? null : json.decode(c.toDartString());
   }

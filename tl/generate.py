@@ -10,7 +10,7 @@ data_map = {
     'string': 'String',
     'int32': 'int',
     'int53': 'int',
-    'int64': 'int',
+    'int64': 'String',
     'bytes': 'String', # 'Uint8List',
     'Bool': 'bool',
     "vector<T>": 'List<T>',
@@ -80,7 +80,9 @@ def vector_to_List(vector):
     return f"List<{dtype}>", _, Type(istl.value * 2)
 
 def to_DartType(type_: str) -> Tuple[str, str, Type]:
-                                #    d     t   enum
+                                   #    d     t   enum
+    if type_.startswith('int64'):
+        return "String", type_, Type.DART
     if type_.startswith('int'):
         return "int", type_,  Type.DART
 
@@ -144,46 +146,51 @@ def construct(tl_constructor: str, f, class__: str, isfunc=False):
                     isabst = absts[dtype]
                     is_tl = True
                     if isabst:
-                        temp = f"switch (_list[{i+1}]['@type']) {{"
+                        temp = f"switch (_map?[{darg}]?['@type']) {{"
                         for a in isabst:
                             temp += f"""
                             case '{a}':
-                                {_xdarg} = {a}.fromList(_list[{i+1}].values.toList());
+                                {_xdarg} = {a}.fromMap(_map?["{darg}"]);
                                 break;
                             """
-                        temp += "}\n"
+                        temp += f"""
+                            case null:
+                            default:
+                                {_xdarg} = null;
+                                break;
+                        }}
+                        """
                         
                         ldargs += temp
                     else:
-                        ldargs += f'{_xdarg} = {dtype}.fromList(_list[{i+1}].values.toList());\n          '
+                        ldargs += f'{_xdarg} = {dtype}.fromMap(_map?["{darg}"]);\n          '
 
                 elif istlobj == Type.VECTOR_TL:
                     isabst = absts[_]
                     is_tl = True
                     if isabst:
                         # print(dtype, '===')
-                        temp = (f"{_xdarg} = _list[{i+1}].map((e) {{\n"
-                                f"switch (_list[{i+1}]['@type']) {{"
+                        temp = (f"{_xdarg} = _map?['{darg}']?.map((e) {{\n"
+                                f"switch (e['@type']) {{"
                                 
                                 )
                         for a in isabst:
                             temp += f"""
                             case '{a}':
-                                return {a}.fromList(_list[{i+1}].values.toList());
+                                return {a}.fromMap(e);
                             """
 
                         temp += '}}).toList();'
                         ldargs += temp
                         # print('_______________')
                     else:
-                        ldargs += f'{_xdarg} = (_list[{i+1}] as List<{_}>);\n          '
+                        ldargs += f'{_xdarg} = (_map?["{darg}"] as List<{_}>);\n          '
 
                 elif istlobj in (Type.VECTOR_DART, Type.DART):
                     if (i == l - 1):
-                        ldargs += f'if (_list.length == {i+2}){{'
-                        ldargs += f'{_xdarg} = _list[{i+1}];}}\n'
+                        ldargs += f'{_xdarg} = _map?["@extra"];\n'
                     else:
-                        ldargs += f'{_xdarg} = _list[{i+1}];\n          '
+                        ldargs += f'{_xdarg} = _map?["{darg}"];\n          '
             
             # class member
             s = s+f'    {dtype}? {_xdarg};\n'
@@ -214,9 +221,9 @@ def construct(tl_constructor: str, f, class__: str, isfunc=False):
     }}
     """
     extra_methods = f"""\
-    /// from list of args
-    {class_name}.fromList(List<dynamic> _list){{
-        {'var _ = _list[0];'}
+    /// from map of args
+    {class_name}.fromMap(Map<String, dynamic>? _map){{
+        {'var _ = _map?["@type"];'}
         {ldargs}
         }}
     """
