@@ -1,5 +1,8 @@
+import json
+import enum
 import re
 import io
+from typing import Callable, Dict, Set, Tuple, Any
 
 
 data_map = {
@@ -11,7 +14,8 @@ data_map = {
     'bytes': 'String', # 'Uint8List',
     'Bool': 'bool',
     "vector<T>": 'List<T>',
-    "emojis": 'List<String>'
+    "emojis": 'List<String>',
+    'dynamic': 'dynamic',
 
     # vector {t:Type} # [ t ] = Vector t
 }
@@ -35,25 +39,60 @@ abstract class Func extends TlObject {
 """.strip()
 
 preamble = """
-// ignore_for_file: camel_case_types, non_constant_identifier_names, unnecessary_question_mark
+// ignore_for_file: camel_case_types, non_constant_identifier_names, unnecessary_question_mark, no_leading_underscores_for_local_identifiers
 import 'dart:ffi' show Pointer;
 import 'dart:convert' show jsonEncode;
 import 'package:ffi/ffi.dart' show StringUtf8Pointer, Utf8;
 """.strip()
 
+class Type(enum.Enum):
+    TL = 2
+    DART = 3
+    VECTOR_TL = 4
+    VECTOR_DART = 6
+    
+ 
+class _absts:
+    def __init__(self) -> None:
+        self.loaded = False
+        try:
+            _json = json.load(open('tl/members.json'))
+            self.loaded = True
+        except FileNotFoundError:
+            _json = {}
+        self.methods: Dict[str, list] = _json
+    def __getitem__(self, _k):
+        return self.methods.get(_k, None)
+    def __setitem__(self, _k, _v) -> None:
+        if self.loaded:
+            return
+        if _k in self.methods:
+            self.methods[_k].append(_v)
+        else:
+            self.methods[_k] = [_v]
+
+absts = _absts()
 
 def vector_to_List(vector):
     type_ = re.search("vector<(\w+)>", vector).group(1)
-    return f"List<{to_DartType(type_)}>"
+    dtype, _, istl = to_DartType(type_)
 
-def to_DartType(type_: str):
+    return f"List<{dtype}>", _, Type(istl.value * 2)
+
+def to_DartType(type_: str) -> Tuple[str, str, Type]:
+                                #    d     t   enum
     if type_.startswith('int'):
-        return "int"
+        return "int", type_,  Type.DART
 
     if type_.startswith('vector'):
         return vector_to_List(type_)
 
-    return data_map.get(type_, type_[0].lower()+type_[1:])
+    dtype = data_map.get(type_, None)
+    if dtype is not None:
+        return dtype, type_, Type.DART
+    else:
+        return type_[0].lower()+type_[1:], type_[0].lower()+type_[1:], Type.TL
+
 
 
 def construct(tl_constructor: str, f, class__: str, isfunc=False):
@@ -71,39 +110,92 @@ def construct(tl_constructor: str, f, class__: str, isfunc=False):
     if extends:
         # exit()
         what = class__
+        absts[what] = class_name
     elif isfunc:
         what = 'Func'
     else:
         what = "TlObject"
+    
     if isfunc:
         sio.write(f'///Returns {secound}\n///\n')
     sio.write(f"///tl => {tl_constructor}///\n")
     sio.write(f'class {class_name} extends {what} {{\n\n')
     args = [i.split(':') for i in _[1:]]
    
-    s = ''
-    cargs = ''
-    _json = f'"@type": "{class_name}",'
-    if isfunc:
-        args.append(['extra', 'dynamic'])
-    l = len(args)    
+    s = '' # class memebers
+    cargs = '' # constructor args
+    _json = f'"@type": "{class_name}",' 
+    ldargs = '  ' # toList body
+    args.append(['extra', 'dynamic'])
+    l = len(args)   
+    is_tl = False 
     if args:
         for i, d in enumerate(args):
             last = "," if i != l-1  else ""
-            _dtype = to_DartType(d[1])
-            _darg = d[0].strip()
-            _xdarg = _darg if _dtype != _darg else _darg+"_"
+            dtype, _, istlobj = to_DartType(d[1])
+            darg = d[0].strip()
+            _xdarg = darg if dtype != darg else darg+"_"
+            
             if class_name == _xdarg:
                 # print("same")
                 _xdarg+='_'
-            s = s+f'    {_dtype}? {_xdarg};\n'
+            if not isfunc:
+                if istlobj == Type.TL:
+                    isabst = absts[dtype]
+                    is_tl = True
+                    if isabst:
+                        temp = f"switch (_list[{i+1}]['@type']) {{"
+                        for a in isabst:
+                            temp += f"""
+                            case '{a}':
+                                {_xdarg} = {a}.fromList(_list[{i+1}].values.toList());
+                                break;
+                            """
+                        temp += "}\n"
+                        
+                        ldargs += temp
+                    else:
+                        ldargs += f'{_xdarg} = {dtype}.fromList(_list[{i+1}].values.toList());\n          '
+
+                elif istlobj == Type.VECTOR_TL:
+                    isabst = absts[_]
+                    is_tl = True
+                    if isabst:
+                        # print(dtype, '===')
+                        temp = (f"{_xdarg} = _list[{i+1}].map((e) {{\n"
+                                f"switch (_list[{i+1}]['@type']) {{"
+                                
+                                )
+                        for a in isabst:
+                            temp += f"""
+                            case '{a}':
+                                return {a}.fromList(_list[{i+1}].values.toList());
+                            """
+
+                        temp += '}}).toList();'
+                        ldargs += temp
+                        # print('_______________')
+                    else:
+                        ldargs += f'{_xdarg} = (_list[{i+1}] as List<{_}>);\n          '
+
+                elif istlobj in (Type.VECTOR_DART, Type.DART):
+                    if (i == l - 1):
+                        ldargs += f'if (_list.length == {i+2}){{'
+                        ldargs += f'{_xdarg} = _list[{i+1}];}}\n'
+                    else:
+                        ldargs += f'{_xdarg} = _list[{i+1}];\n          '
+            
+            # class member
+            s = s+f'    {dtype}? {_xdarg};\n'
+
+            # constructor args
             cargs+= f'this.{_xdarg}{last}'
-            if (i is l - 1) and isfunc:
+            if (i is l - 1):
                 # print(i, l)
                 _json += "if(extra != null) '@extra': extra"
                 # print(_json)
                 continue
-            _json += f'"{_darg}": {_xdarg}{last}'
+            _json += f'"{darg}": {_xdarg}{last}'
 
         
         
@@ -121,7 +213,17 @@ def construct(tl_constructor: str, f, class__: str, isfunc=False):
          return jsonEncode(toJson()).toNativeUtf8();
     }}
     """
+    extra_methods = f"""\
+    /// from list of args
+    {class_name}.fromList(List<dynamic> _list){{
+        {'var _ = _list[0];'}
+        {ldargs}
+        }}
+    """
+
     sio.write(methods)
+    if not isfunc:
+        sio.write(extra_methods)
         
     sio.write('}\n')
 
@@ -181,7 +283,18 @@ def generate():
                         _io.write(f'/{i}///\n')
 
 
+
+# class setSerilizer(json.JSONEncoder):
+#     def default(self, o: Any) -> Any:
+#         if isinstance(o, set):
+#             return list(o)
+#         return super().default(o) cls=setSerilizer
+    
+
 if __name__ =='__main__':
-    import os
+    import os, json
     os.makedirs("lib/td/", exist_ok=True)
     generate()
+    # print(absts.methods)
+    # print(json.dumps(absts.methods, indent=4, ), file=open('tl/members.json','w'))
+    os.popen(f'dart format {exports_class} {exports_function}')
