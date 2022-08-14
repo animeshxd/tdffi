@@ -292,6 +292,9 @@ def generate():
                         _class = re.search('//@class (.+) @description (.+)', i)
                         name, desc = _class.groups()
                         class__ = name[0].lower()+name[1:]
+                        if absts.loaded:
+                            _io.write("///"+"".join(i + ' , ' for i in absts[class__]))
+                            _io.write('\n///\n')
                         _io.write(f'///@description {desc}\n///\n')
                         _io.write(f'abstract class {class__} extends TlObject {{}}\n')
                     else:
