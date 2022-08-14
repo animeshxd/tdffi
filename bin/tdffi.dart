@@ -83,6 +83,18 @@ void main(List<String> arguments) async {
           print(user.user_!.first_name);
           // print(user.toJson());
           break;
+
+        case 'updateNewMessage':
+          var message = td.updateNewMessage.fromMap(r);
+          var type = message.message_?.content.runtimeType;
+          print(type);
+  
+          if (type == td.messageText) {
+            var content = (message.message_?.content as td.messageText);
+            print(content.text?.text);
+          }
+          break;
+        case 'updateSupergroup':
         case 'updateNewChat':
         case 'updateOption':
           break;
