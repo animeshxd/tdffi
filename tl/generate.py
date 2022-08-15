@@ -13,7 +13,6 @@ data_map = {
     'int64': 'String',
     'bytes': 'String', # 'Uint8List',
     'Bool': 'bool',
-    "vector<T>": 'List<T>',
     "emojis": 'List<String>',
     'dynamic': 'dynamic',
 
@@ -82,12 +81,7 @@ def vector_to_List(vector):
     return f"List<{dtype}>", _, Type(istl.value * 2)
 
 def to_DartType(type_: str) -> Tuple[str, str, Type]:
-                                   #    d     t   enum
-    if type_.startswith('int64'):
-        return "String", type_, Type.DART
-    if type_.startswith('int'):
-        return "int", type_,  Type.DART
-
+                                #    d     t   enum
     if type_.startswith('vector'):
         return vector_to_List(type_)
 
@@ -132,7 +126,6 @@ def construct(tl_constructor: str, f, class__: str, isfunc=False):
     ldargs = '  ' # toList body
     args.append(['extra', 'dynamic'])
     l = len(args)   
-    is_tl = False 
     if args:
         for i, d in enumerate(args):
             last = "," if i != l-1  else ""
@@ -146,7 +139,6 @@ def construct(tl_constructor: str, f, class__: str, isfunc=False):
             if not isfunc:
                 if istlobj == Type.TL:
                     isabst = absts[dtype]
-                    is_tl = True
                     if isabst:
                         temp = f"switch (_map?['{darg}']?['@type']) {{"
                         for a in isabst:
@@ -169,7 +161,6 @@ def construct(tl_constructor: str, f, class__: str, isfunc=False):
 
                 elif istlobj == Type.VECTOR_TL:
                     isabst = absts[_]
-                    is_tl = True
                     if isabst:
                         # print(dtype, '===')
                         temp = (f"{_xdarg} = _map?['{darg}']?.map((e) {{\n"
