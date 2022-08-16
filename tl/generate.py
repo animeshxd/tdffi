@@ -2,7 +2,7 @@ import json
 import enum
 import re
 import io
-from typing import Callable, Dict, Set, Tuple, Any
+from typing import Dict, Tuple
 
 
 data_map = {
@@ -75,7 +75,7 @@ class _absts:
 absts = _absts()
 
 description = ""
-param_description = {}
+param_description: Dict[str, tuple] = {}
 
 def vector_to_List(vector):
     type_ = re.search("vector<(\w+)>", vector).group(1)
@@ -129,85 +129,84 @@ def construct(tl_constructor: str, f, class__: str, isfunc=False):
     ldargs = '  ' # toList body
     args.append(['extra', 'dynamic'])
     l = len(args)   
-    if args:
-        for i, d in enumerate(args):
-            last = "," if i != l-1  else ""
-            dtype, _, istlobj = to_dart_type(d[1])
-            darg = d[0].strip()
-            pd_ = param_description.get(darg, "Extra param")
-            _xdarg = darg if dtype != darg else darg+"_"
-            
-            if class_name == _xdarg:
-                # print("same")
-                _xdarg+='_'
-            if not isfunc:
-                if istlobj == Type.TL:
-                    isabst = absts[dtype]
-                    if isabst:
-                        temp = f"switch (_map?['{darg}']?['@type']) {{"
-                        for a in isabst:
-                            temp += f"""
-                            case '{a}':
-                                {_xdarg} = {a}.fromMap(_map?["{darg}"]);
-                                break;
-                            """
+    for i, d in enumerate(args):
+        last = "," if i != l-1  else ""
+        dtype, _, istlobj = to_dart_type(d[1])
+        darg = d[0].strip()
+        pd_, is_null = param_description.get(darg, ("Extra param", True))
+        _xdarg = darg if dtype != darg else darg+"_"
+        
+        if class_name == _xdarg:
+            # print("same")
+            _xdarg+='_'
+        if not isfunc:
+            if istlobj == Type.TL:
+                isabst = absts[dtype]
+                if isabst:
+                    temp = f"switch (_map['{darg}']{'?' if is_null else ''}['@type']) {{"
+                    for a in isabst:
                         temp += f"""
-                            case null:
-                            default:
-                                {_xdarg} = null;
-                                break;
-                        }}
+                        case '{a}':
+                            {_xdarg} = {a}.fromMap(_map["{darg}"]);
+                            break;
                         """
-                        
-                        ldargs += temp
-                    else:
-                        ldargs += f'{_xdarg} = {dtype}.fromMap(_map?["{darg}"]);\n          '
+                    temp += f"""
+                        case null:
+                        default:
+                            {f"{_xdarg} = null;" if is_null else ''}
+                            break;
+                    }}
+                    """
+                    
+                    ldargs += temp
+                else:
+                    ldargs += f'{_xdarg} = {dtype}.fromMap(_map["{darg}"]);\n          '
 
-                elif istlobj == Type.VECTOR_TL:
-                    isabst = absts[_]
-                    if isabst:
-                        # print(dtype, '===')
-                        temp = (f"{_xdarg} = _map?['{darg}']?.map((e) {{\n"
-                                f"switch (e['@type']) {{"
-                                
-                                )
-                        for a in isabst:
-                            temp += f"""
-                            case '{a}':
-                                return {a}.fromMap(e);
-                            """
+            elif istlobj == Type.VECTOR_TL:
+                isabst = absts[_]
+                if isabst:
+                    # print(dtype, '===')
+                    temp = (f"{_xdarg} = _map['{darg}']{'?' if is_null else ''}.map((e) {{\n"
+                            f"switch (e['@type']) {{"
+                            
+                            )
+                    for a in isabst:
+                        temp += f"""
+                        case '{a}':
+                            return {a}.fromMap(e);
+                        """
 
-                        temp += '}}).toList();'
-                        ldargs += temp
-                        # print('_______________')
-                    else:
-                        # ldargs += f'{_xdarg} = (_map?["{darg}"] ?? [])?.map((e) => {_}.fromMap(e)).toList();\n          '
-                        ldargs += f'{_xdarg} = {dtype}.from((_map?["{darg}"] ?? []).map((e) => {_}.fromMap(e)));\n          '
+                    temp += '}}).toList();'
+                    ldargs += temp
+                    # print('_______________')
+                else:
+                    # ldargs += f'{_xdarg} = (_map?["{darg}"] ?? [])?.map((e) => {_}.fromMap(e)).toList();\n          '
+                    ldargs += f'{_xdarg} = {dtype}.from((_map["{darg}"] ?? []).map((e) => {_}.fromMap(e)));\n          '
 
-                elif istlobj in (Type.VECTOR_DART, Type.DART):
-                    if (i == l - 1):
-                        ldargs += f'{_xdarg} = _map?["@extra"];\n'
-                    else:
-                        ldargs += f'{_xdarg} = _map?["{darg}"];\n          '
-            
-            # class member
-            s   +=f"    ///{pd_}\n"
-            s = s+f'    {dtype}? {_xdarg};\n'
-
-            # constructor args
-            cargs+= f'this.{_xdarg}{last}'
-            if (i is l - 1):
-                # print(i, l)
-                _json += "if(extra != null) '@extra': extra"
-                # print(_json)
-                continue
-            _json += f'"{darg}": {_xdarg}{last}'
-
+            elif istlobj in (Type.VECTOR_DART, Type.DART):
+                if (i == l - 1):
+                    ldargs += f'{_xdarg} = _map["@extra"];\n'
+                else:
+                    ldargs += f'{_xdarg} = _map["{darg}"];\n          '
         
-        
-        sio.write(f'    {class_name}({{{cargs}}});\n\n')
-        sio.write(s)
-        sio.write("\n")
+        # class member
+        s   +=f"    ///{pd_}\n"
+        s = s+f"    {'late ' if not is_null else ''}{dtype}{'?' if is_null else ''} {_xdarg};\n"
+
+        # constructor args
+        cargs+= f"{'required ' if not is_null else ''}this.{_xdarg}{last}"
+        if (i is l - 1):
+            # print(i, l)
+            _json += "if(extra != null) '@extra': extra"
+            # print(_json)
+            continue
+        _json += f'"{darg}": {_xdarg}{last}'
+
+    
+    
+    sio.write(f'    {class_name}({{{cargs}}});\n\n')
+    sio.write(s)
+    sio.write("\n")
 
     methods = f"""\
     final String TYPE = "{class_name}";
@@ -227,7 +226,8 @@ def construct(tl_constructor: str, f, class__: str, isfunc=False):
     extra_methods = f"""\
     /// Construct from `Map`
     {class_name}.fromMap(Map<String, dynamic>? _map){{
-        {'var _ = _map?["@type"];'}
+        if (_map == null) return;
+        {'var _ = _map["@type"];'}
         {ldargs}
         }}
     """
@@ -293,7 +293,7 @@ def generate():
                         if absts.loaded:
                             _io.write("///"+"".join(i + ' , ' for i in absts[class__]))
                             _io.write('\n///\n')
-                        _io.write(f'///@description {desc}\n///\n')
+                        _io.write(f'///{desc}\n///\n')
                         _io.write(f'abstract class {class__} extends TlObject {{}}\n')
                     else:
                         #3(param), 4(description)
@@ -301,10 +301,10 @@ def generate():
                             param, desc = i.group(3), i.group(4) # variable # description
                             param_ = i.group(2) # param_
                             if param == 'description' and param_ is None:
-                                description = desc[0].upper()+desc[1:].upper()
+                                description = desc
                                 _io.write(f'///{desc}\n///\n')
                             else:
-                                param_description[param.strip()] = desc
+                                param_description[param.strip()] = (desc, re.search("(?i)(may be null|If empty)", desc))
                                 _io.write(f'///[{param}] -{desc}\n///\n')
 
 
