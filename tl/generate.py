@@ -74,13 +74,16 @@ class _absts:
 
 absts = _absts()
 
+description = ""
+param_description = {}
+
 def vector_to_List(vector):
     type_ = re.search("vector<(\w+)>", vector).group(1)
-    dtype, _, istl = to_DartType(type_)
+    dtype, _, istl = to_dart_type(type_)
 
     return f"List<{dtype}>", _, Type(istl.value * 2)
 
-def to_DartType(type_: str) -> Tuple[str, str, Type]:
+def to_dart_type(type_: str) -> Tuple[str, str, Type]:
                                 #    d     t   enum
     if type_.startswith('vector'):
         return vector_to_List(type_)
@@ -116,7 +119,7 @@ def construct(tl_constructor: str, f, class__: str, isfunc=False):
     
     if isfunc:
         sio.write(f'///Returns {secound}\n///\n')
-    sio.write(f"///tl => {tl_constructor}///\n")
+    sio.write(f"///{tl_constructor}///\n")
     sio.write(f'class {class_name} extends {what} {{\n\n')
     args = [i.split(':') for i in _[1:]]
    
@@ -129,8 +132,9 @@ def construct(tl_constructor: str, f, class__: str, isfunc=False):
     if args:
         for i, d in enumerate(args):
             last = "," if i != l-1  else ""
-            dtype, _, istlobj = to_DartType(d[1])
+            dtype, _, istlobj = to_dart_type(d[1])
             darg = d[0].strip()
+            pd_ = param_description.get(darg, "Extra param")
             _xdarg = darg if dtype != darg else darg+"_"
             
             if class_name == _xdarg:
@@ -187,6 +191,7 @@ def construct(tl_constructor: str, f, class__: str, isfunc=False):
                         ldargs += f'{_xdarg} = _map?["{darg}"];\n          '
             
             # class member
+            s   +=f"    ///{pd_}\n"
             s = s+f'    {dtype}? {_xdarg};\n'
 
             # constructor args
@@ -220,7 +225,7 @@ def construct(tl_constructor: str, f, class__: str, isfunc=False):
     }}
     """
     extra_methods = f"""\
-    /// from map of args
+    /// Construct from `Map`
     {class_name}.fromMap(Map<String, dynamic>? _map){{
         {'var _ = _map?["@type"];'}
         {ldargs}
@@ -275,6 +280,8 @@ def generate():
                         raise
 
                 if i.startswith('\n'):
+                    description = ""
+                    param_description.clear()
                     _io.write(i)
 
                 if i.startswith('//'):
@@ -289,7 +296,16 @@ def generate():
                         _io.write(f'///@description {desc}\n///\n')
                         _io.write(f'abstract class {class__} extends TlObject {{}}\n')
                     else:
-                        _io.write(f'/{i}///\n')
+                        #3(param), 4(description)
+                        for i in re.finditer(r"(?=(@(param_)?(\w+)(.+?))(@|$))", i):
+                            param, desc = i.group(3), i.group(4) # variable # description
+                            param_ = i.group(2) # param_
+                            if param == 'description' and param_ is None:
+                                description = desc[0].upper()+desc[1:].upper()
+                                _io.write(f'///{desc}\n///\n')
+                            else:
+                                param_description[param.strip()] = desc
+                                _io.write(f'///[{param}] -{desc}\n///\n')
 
 
 
