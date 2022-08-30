@@ -304,7 +304,7 @@ def generate():
                                 description = desc
                                 _io.write(f'///{desc}\n///\n')
                             else:
-                                param_description[param.strip()] = (desc, re.search("(?i)(may be null|If empty)", desc))
+                                param_description[param.strip()] = (desc, re.search("(?i)(may be null|If empty|pass null)", desc))
                                 _io.write(f'///[{param}] -{desc}\n///\n')
 
 
