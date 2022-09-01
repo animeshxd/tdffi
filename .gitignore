@@ -10,3 +10,5 @@ lib/td/functions.dart
 lib/ffi/td_json_client.h
 lib/ffi/tdjson_export.h
 tl/td_api.tl
+tl/regex_test.py
+tl/regex_text.txt

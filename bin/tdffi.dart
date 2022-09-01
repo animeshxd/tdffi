@@ -14,6 +14,10 @@ void main(List<String> arguments) async {
   var client_id = tdlib.td_json_client_create();
 
   var params = td.tdlibParameters(
+      use_test_dc: false,
+      use_file_database: false,
+      use_chat_info_database: false,
+      ignore_file_names: false,
       database_directory: '/tmp/tdlib',
       use_message_database: true,
       use_secret_chats: true,
@@ -80,18 +84,19 @@ void main(List<String> arguments) async {
           // print(r['user']?['profile_photo']?['small']?['id']?.runtimeType);
 
           var user = td.updateUser.fromMap(r);
-          print(user.user_!.first_name);
+          print(user.user_.first_name);
+          print(user.user_.last_name);
           // print(user.toJson());
           break;
 
         case 'updateNewMessage':
           var message = td.updateNewMessage.fromMap(r);
-          var type = message.message_?.content.runtimeType;
+          var type = message.message_.content.runtimeType;
           print(type);
-  
+
           if (type == td.messageText) {
-            var content = (message.message_?.content as td.messageText);
-            print(content.text?.text);
+            var content = (message.message_.content as td.messageText);
+            print(content.text.text);
           }
           break;
         case 'updateSupergroup':
